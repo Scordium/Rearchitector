@@ -53,8 +53,6 @@ class REARCHITECT_API ARearchitectorEquipment : public AFGEquipment
 	
 public:
 
-	virtual bool ShouldSaveState() const override { return true; }
-
 	UFUNCTION(BlueprintCallable) void PerformMove(const FVector& Translation);
 	UFUNCTION(BlueprintCallable) void MoveToAimPosition(const FInputActionValue& ActionValue);
 
@@ -159,6 +157,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, SaveGame)
 	bool UseActionToggle;
+
+	UPROPERTY(BlueprintReadOnly)
+	FArchitectorToolTarget CurrentTarget;
 	
 	UPROPERTY(BlueprintReadWrite, SaveGame)
 	TEnumAsByte<ECurrentToolMode> CurrentToolMode = CTM_None;

@@ -27,7 +27,7 @@ void FArchitectorTargetManager::MoveAllToPosition(const FVector& NewPosition)
 	const auto OriginPosition = GetTargetListOriginPosition();
 	const auto DeltaPosition = Movement.TransformPosition(NewPosition - OriginPosition);
 	
-	auto Action = GetIfLastOrMakeNew<UToolMoveToPositionAction>();
+	auto Action = LastOrNewAction<UToolMoveToPositionAction>();
 	
 	Action->CurrentDelta = DeltaPosition;
 	Action->PerformAction();
@@ -115,8 +115,8 @@ void FArchitectorTargetManager::SetRotationToPosition(const FVector& Position, E
 	FActorTransformModifyData Data = FActorTransformModifyData();
 	for(auto& Target : Targets)
 	{
-		if(!Target.Target) continue;
-		auto PositionDelta = Position - Target.Target->GetActorLocation();
+		if(!Target.IsValid()) continue;
+		auto PositionDelta = Position - Target.GetTargetTransform().GetLocation();
 		FMatrix ActorRotation;
 
 		switch (Axis)
@@ -183,10 +183,10 @@ FVector FArchitectorTargetManager::GetTargetListCenterPosition() const
 
 	for (const FArchitectorToolTarget& Target : Targets)
 	{
-		if(!Target.Target) continue;
+		if(!Target.IsValid()) continue;
 
-		Bounds += Target.Target->GetComponentsBoundingBox(true, true);
-		PositionSum += Target.Target->GetActorLocation();
+		Bounds += Target.GetBounds();
+		PositionSum += Target.GetTargetTransform().GetLocation();
 		ValidObjects++;
 	}
 
@@ -197,7 +197,7 @@ FVector FArchitectorTargetManager::GetTargetListCenterPosition() const
 FVector FArchitectorTargetManager::GetTargetListOriginPosition() const
 {
 	if(Targets.Num() == 0) return FVector::ZeroVector;
-	if(Targets.Num() == 1) return Targets[0].Target->GetActorLocation();
+	if(Targets.Num() == 1) return Targets[0].GetTargetTransform().GetLocation();
 	
 	double LowestZ = MAX_dbl;
 	FVector TargetPositionSum = FVector::ZeroVector;
@@ -205,9 +205,9 @@ FVector FArchitectorTargetManager::GetTargetListOriginPosition() const
 	
 	for (const auto& Target : Targets)
 	{
-		if(!Target.Target) continue;
+		if(!Target.IsValid()) continue;
 
-		auto TargetPos = Target.Target->GetActorLocation();
+		auto TargetPos = Target.GetTargetTransform().GetLocation();
 		if(TargetPos.Z < LowestZ) LowestZ = TargetPos.Z;
 		TargetPositionSum += TargetPos;
 		TargetCount++;
@@ -225,10 +225,10 @@ FBox FArchitectorTargetManager::GetTargetListBoundingBox(FVector& CalculatedCent
 
 	for (const FArchitectorToolTarget& Target : Targets)
 	{
-		if(!Target.Target) continue;
+		if(!Target.IsValid()) continue;
 
-		Bounds += Target.Target->GetComponentsBoundingBox(true, true);
-		PositionSum += Target.Target->GetActorLocation();
+		Bounds += Target.GetBounds();
+		PositionSum += Target.GetTargetTransform().GetLocation();
 		ValidObjects++;
 	}
 
@@ -243,28 +243,17 @@ void FArchitectorTargetManager::GetTargetListBounds(FVector& Min, FVector& Max) 
 
 	for (const FArchitectorToolTarget& Target : Targets)
 	{
-		if(!Target.Target) continue;
+		if(!Target.IsValid()) continue;
 		
-		auto TLoc = Target.Target->GetActorLocation();
+		auto TLoc = Target.GetTargetTransform().GetLocation();
 		Min = Min.ComponentMin(TLoc);
 		Max = Max.ComponentMax(TLoc);
 	}
 }
 
-TArray<AActor*> FArchitectorTargetManager::GetTargetActors() const
-{
-	TArray<AActor*> Out;
-	for (const FArchitectorToolTarget& Target : Targets) Out.Add(Target.Target);
-	return Out;
-}
-
 void FArchitectorTargetManager::AddIgnoredActorsToTrace(FCollisionQueryParams& QueryParams)
 {
-	for (const FArchitectorToolTarget& Target : Targets)
-	{
-		QueryParams.AddIgnoredActor(Target.Target);
-		QueryParams.AddIgnoredComponent(Target.HitComponent);
-	}
+	for (const FArchitectorToolTarget& Target : Targets) Target.AddToRaycastIgnored(QueryParams);
 }
 
 

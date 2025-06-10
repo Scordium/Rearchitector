@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ActorUtilities.h"
+#include "FGBlueprintFunctionLibrary.h"
 #include "Components/BillboardComponent.h"
 #include "Subsystem/ModSubsystem.h"
 #include "RearchitectorSubsystem.generated.h"
@@ -51,8 +51,8 @@ class REARCHITECT_API ARearchitectorSubsystem : public AModSubsystem
 		OutlineProxyMeshComponent->bDisallowNanite = true;
 
 		// Do not render the component in the main or depth pass, but render it in custom depth pass to show the outline
-		OutlineProxyMeshComponent->SetRenderInDepthPass( false );
 		OutlineProxyMeshComponent->SetRenderInMainPass( false );
+		OutlineProxyMeshComponent->SetRenderInDepthPass( false );
 		UFGBlueprintFunctionLibrary::ShowOutline( OutlineProxyMeshComponent, EOutlineColor::OC_HOLOGRAM );
 
 		OutlineProxyMeshComponent->RegisterComponent();
@@ -64,22 +64,6 @@ class REARCHITECT_API ARearchitectorSubsystem : public AModSubsystem
 public:
 
 	static inline ARearchitectorSubsystem* Self;
-
-	void HideOutline(const TArray<AActor*>& OutlinedActors){ UActorUtilities::HideOutlineMultiForActors(OutlinedActors, OutlineProxyData); }
-	
-	void RefreshOutline(const TArray<AActor*>& InActors, EOutlineColor OutlineColor = EOutlineColor::OC_HOLOGRAM)
-	{
-		UActorUtilities::HideOutlineMultiForActors(InActors, OutlineProxyData);
-		UActorUtilities::ShowOutlineMultiForActors(Proxy, InActors, OutlineProxyData, OutlineColor);
-	}
-
-	void RefreshOutline(const TMap<AActor*, EOutlineColor>& InActors)
-	{
-		TArray<AActor*> Actors;
-		InActors.GenerateKeyArray(Actors);
-		UActorUtilities::HideOutlineMultiForActors(Actors, OutlineProxyData);
-		UActorUtilities::ShowOutlineMultiForActors(Proxy, InActors, OutlineProxyData);
-	}
 
 	UFUNCTION(BlueprintCallable)
 	void UpdateMassSelectBounds(const FVector& StartPosition, const FVector& CurrentPosition, EOutlineColor OutlineColor)
@@ -107,10 +91,6 @@ public:
 	{
 		return Proxy->MassSelectMesh->GetOverlapInfos();
 	}
-
-
-	UPROPERTY()
-	TMap<UStaticMesh*, UInstancedStaticMeshComponent*> OutlineProxyData;
 
 	UPROPERTY()
 	AOutlineProxyActor* Proxy;

@@ -114,8 +114,5 @@ public:
 	FTransform ActorTransform = FTransform::Identity;
 
 	UPROPERTY(SaveGame, BlueprintReadWrite)
-	FTransform TestTransform;
-
-	UPROPERTY(SaveGame, BlueprintReadWrite)
 	FTransform AbstractTransform;
 };

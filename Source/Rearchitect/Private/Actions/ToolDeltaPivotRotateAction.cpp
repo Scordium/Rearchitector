@@ -9,7 +9,7 @@ void UToolDeltaPivotRotateAction::PerformAction_Implementation()
 
 	for (const FArchitectorToolTarget& Target : Targets)
 	{
-		const auto TargetDistance = Target.Target->GetActorLocation() - Origin;
+		const auto TargetDistance = Target.GetTargetTransform().GetLocation() - Origin;
 		const auto RotatedTargetDistance = TargetDistance.RotateAngleAxis(Angle, Axis);
 		const auto DistanceDelta = RotatedTargetDistance - TargetDistance;
 

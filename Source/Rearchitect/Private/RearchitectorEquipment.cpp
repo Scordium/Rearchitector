@@ -5,6 +5,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "RearchitectorSubsystem.h"
+#include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 
 
@@ -72,22 +73,24 @@ void ARearchitectorEquipment::PerformScale(const FVector& Scale)
 
 void ARearchitectorEquipment::RefreshOutline()
 {
-	ARearchitectorSubsystem::Self->RefreshOutline(TargetManager.GetTargetActors());
+	HideOutlines();
+	ShowOutlines();
 }
 
 void ARearchitectorEquipment::HideOutlines()
 {
-	GetInstigatorCharacter()->GetOutline()->HideOutline();
-	ARearchitectorSubsystem::Self->HideOutline(TargetManager.GetTargetActors());
+	TargetManager.HideOutlines();
 }
 
 void ARearchitectorEquipment::ShowOutlines()
 {
-	ARearchitectorSubsystem::Self->RefreshOutline(TargetManager.GetTargetActors());
+	TargetManager.ShowOutlines(EOutlineColor::OC_HOLOGRAM);
 }
 
 void ARearchitectorEquipment::PreviewMassSelectActors()
 {
+	//TODO: Fix
+	/*
 	FVector Min, Max;
 	TargetManager.GetTargetListBounds(Min, Max);
 	ARearchitectorSubsystem::Self->UpdateMassSelectBounds(Min, Max, EOutlineColor::OC_NONE);
@@ -101,7 +104,8 @@ void ARearchitectorEquipment::PreviewMassSelectActors()
 		OutlineActors.Add(Target.Target, TargetManager.HasTarget(Target) ? EOutlineColor::OC_HOLOGRAM : EOutlineColor::OC_DISMANTLE);
 	}
 
-	ARearchitectorSubsystem::Self->RefreshOutline(OutlineActors);
+	*/
+	RefreshOutline();
 }
 
 void ARearchitectorEquipment::HideMassSelectActors()
@@ -140,14 +144,22 @@ void ARearchitectorEquipment::Tick(float DeltaSeconds)
 
 	bool Success;
 	auto Data = GetTraceData(TraceDistance, TraceTypeQuery1, Success);
-	auto Outline = GetInstigatorCharacter()->GetOutline();
 	
-	if(!Success || !FArchitectorToolTarget::IsValidTarget(Data)) Outline->HideOutline();
-	else
+	if (Success && FArchitectorToolTarget::IsValidTarget(Data))
 	{
 		auto Target = FArchitectorToolTarget(Data);
 		bool IsTargeted = !TargetManager.HasAnyTargets() || TargetManager.HasTarget(Target);
-		Outline->ShowOutline(Target.Target, IsTargeted ? EOutlineColor::OC_HOLOGRAM : EOutlineColor::OC_SOFTCLEARANCE);
+		if (!CurrentTarget.Equals(Target))
+		{
+			CurrentTarget.HideOutline();
+			Target.ShowOutline(IsTargeted ? EOutlineColor::OC_HOLOGRAM : EOutlineColor::OC_SOFTCLEARANCE);
+			CurrentTarget = Target;
+		}
+	}
+	else
+	{
+		CurrentTarget.HideOutline();
+		CurrentTarget = FArchitectorToolTarget();
 	}
 
 
@@ -215,7 +227,7 @@ void ARearchitectorEquipment::AddActor()
 	if(Success)
 	{
 		auto TargetData = FArchitectorToolTarget(Target);
-		if(!TargetData.Target) return;
+		//if(!TargetData.HitComponent) return;
 		
 		if(TargetManager.HasTarget(TargetData)) TargetManager.RemoveTarget(TargetData);
 		else TargetManager.AddTarget(TargetData);

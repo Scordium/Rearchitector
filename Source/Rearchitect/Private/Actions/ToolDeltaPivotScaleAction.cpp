@@ -13,7 +13,7 @@ void UToolDeltaPivotScaleAction::PerformAction_Implementation()
 	
 	for (const FArchitectorToolTarget& Target : Targets)
 	{
-		const auto TargetDistance = Target.Target->GetActorLocation() - ShrinkCenter;
+		const auto TargetDistance = Target.GetTargetTransform().GetLocation() - ShrinkCenter;
 		const auto ScaledDistance = TargetDistance * DistanceModifier;
 		const auto DistanceDelta = TargetDistance - ScaledDistance;
 

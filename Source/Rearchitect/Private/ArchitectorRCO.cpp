@@ -1,6 +1,5 @@
 ﻿#include "ArchitectorRCO.h"
 
-#include "ActorUtilities.h"
 #include "FGPlayerState.h"
 
 void UArchitectorRCO::ApplyModifyDataToAll_Implementation(const TArray<FArchitectorToolTarget>& Targets, const FActorTransformModifyData& TransformData)
@@ -32,14 +31,13 @@ void UArchitectorRCO::Multicast_ApplyTransformOnEach_Implementation(const TArray
 {
 	for (const FTargetTransformData& TargetTransformData : Data)
 	{
-		if(!TargetTransformData.Target.Target) continue;
+		if(!TargetTransformData.Target.IsValid()) continue;
 		
 		const auto& ActorT = TargetTransformData.ActorTransform;
 		const auto& AbstT = TargetTransformData.AbstractTransform;
 		const auto& Target = TargetTransformData.Target;
 
-		Target.Target->SetActorTransform(ActorT);
-		if(Target.IsAbstract) Target.GenerateInstanceHandle().UpdateTransform(AbstT);
+		Target.SetTargetTransform(ActorT);
 	}
 }
 
@@ -49,59 +47,28 @@ void UArchitectorRCO::DismantleAndRefund_Implementation(AFGPlayerState* Player, 
 	const bool NoBuildCost = Player->GetPlayerRules().NoBuildCost;
 
 	for (const FArchitectorToolTarget& Target : Targets)
-	{
-		auto Buildable = Cast<AFGBuildable>(Target.Target);
-		if(!Buildable) continue;
-
-		IFGDismantleInterface::Execute_GetDismantleRefund(Buildable, Refund, NoBuildCost);
-		IFGDismantleInterface::Execute_Dismantle(Buildable);
-	}
+		Refund.Append(Target.Dismantle(NoBuildCost));
 
 	Cast<AFGCharacterPlayer>(Player->GetPawn())->GetInventory()->AddStacks(Refund);
 }
 
 void UArchitectorRCO::PerformActionOnTarget(const FArchitectorToolTarget& Target, const FActorTransformModifyData& TransformData)
 {
-	if(!Target.Target) return;
-	
-	FInstanceHandle InstanceHandle;
-	//Make target actor movable
-	if(auto Root = Target.Target->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
-	if(Target.IsAbstract)
-	{
-		InstanceHandle = Target.GenerateInstanceHandle();
-		InstanceHandle.GetInstanceComponent()->SetMobility(EComponentMobility::Movable);
-	}
-	
-	for(auto& Component : TInlineComponentArray<UFGColoredInstanceMeshProxy*>( Target.Target ))
-	{
-		UActorUtilities::RefreshInstanceHandle(Component);
-	}
+	if(!Target.IsValid()) return;
+	Target.MakeMovable();
+
+	auto Transform = Target.GetTargetTransform();
 
 	//Move
 	if(TransformData.Move.IsUsed)
 	{
 		//Transform actor
-		auto Transform = Target.Target->GetTransform();
 		auto& PositionValue = TransformData.Move.Value;
 			
 		if(TransformData.Move.UseAsSetAction) Transform.SetLocation(PositionValue);
 		else Transform.AddToTranslation(PositionValue);
 			
-		Target.Target->SetActorTransform(Transform);
-		Target.Target->CachedActorTransform = Transform;
-		
-
-		//Transform abstract instance
-		if(Target.IsAbstract)
-		{
-			InstanceHandle.GetInstanceComponent()->GetInstanceTransform(InstanceHandle.GetHandleID(), Transform);
-
-			if(TransformData.Move.UseAsSetAction) Transform.SetLocation(PositionValue);
-			else Transform.AddToTranslation(PositionValue);
-				
-			InstanceHandle.UpdateTransform(Transform);
-		}
+		Target.SetTargetTransform(Transform);
 	}
 
 	//Rotate
@@ -110,23 +77,9 @@ void UArchitectorRCO::PerformActionOnTarget(const FArchitectorToolTarget& Target
 		//Transform actor
 		auto NewActorRotation = TransformData.Rotate.UseAsSetAction
 		? TransformData.Rotate.Value
-		: TransformData.Rotate.Value * Target.Target->GetActorQuat();
-			
-		Target.Target->SetActorRotation(NewActorRotation);
+		: TransformData.Rotate.Value * Transform.GetRotation();
 
-		//Transform abstract instance
-		if(Target.IsAbstract)
-		{
-			FTransform Transform;
-			InstanceHandle.GetInstanceComponent()->GetInstanceTransform(InstanceHandle.GetHandleID(), Transform);
-
-			auto NewInstanceRotation = TransformData.Rotate.UseAsSetAction
-			? TransformData.Rotate.Value
-			: TransformData.Rotate.Value * Transform.GetRotation();
-
-			Transform.SetRotation(NewInstanceRotation);
-			InstanceHandle.UpdateTransform(Transform);
-		}
+		Transform.SetRotation(NewActorRotation);
 	}
 
 	//Scale
@@ -135,22 +88,10 @@ void UArchitectorRCO::PerformActionOnTarget(const FArchitectorToolTarget& Target
 		//Transform actor
 		auto NewActorScale = TransformData.Scale.UseAsSetAction
 		? TransformData.Scale.Value
-		: Target.Target->GetActorScale3D() + TransformData.Scale.Value;
+		: TransformData.Scale.Value + Transform.GetScale3D();
 
-		Target.Target->SetActorScale3D(NewActorScale);
-
-		//Transform abstract instance
-		if(Target.IsAbstract)
-		{
-			FTransform Transform;
-			InstanceHandle.GetInstanceComponent()->GetInstanceTransform(InstanceHandle.GetHandleID(), Transform);
-
-			auto NewInstanceScale = TransformData.Scale.UseAsSetAction
-			? TransformData.Scale.Value
-			: Transform.GetScale3D() + TransformData.Scale.Value;
-
-			Transform.SetScale3D(NewInstanceScale);
-			InstanceHandle.UpdateTransform(Transform);
-		}
+		Transform.SetScale3D(NewActorScale);
 	}
+
+	Target.SetTargetTransform(Transform);
 }

@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "AbstractInstanceManager.h"
+#include "FGOutlineComponent.h"
 #include "Buildables/FGBuildable.h"
 
 #include "ArchitectorTarget.generated.h"
@@ -10,10 +11,6 @@ struct FArchitectorToolTarget
 	GENERATED_BODY()
 
 public:
-
-	UPROPERTY() AActor* Target = nullptr;
-	UPROPERTY() UPrimitiveComponent* HitComponent = nullptr;
-	UPROPERTY() bool IsAbstract = false;
 
 	FArchitectorToolTarget(){}
 	FArchitectorToolTarget(const FHitResult& HitResult)
@@ -30,6 +27,93 @@ public:
 			IsAbstract = true;
 		}
 		else Target = Cast<AFGBuildable>(HitResult.GetActor());
+	}
+
+	void HideOutline() const
+	{
+		if (!Target) return;
+		
+		if (IsAbstract) UFGBlueprintFunctionLibrary::HideOutline(HitComponent);
+		else UFGOutlineComponent::Get(Target->GetWorld())->HideOutline(Target);
+	}
+
+	void ShowOutline(EOutlineColor Color) const
+	{
+		if (!Target) return;
+		
+		if (IsAbstract) UFGBlueprintFunctionLibrary::ShowOutline(HitComponent, Color);
+		else UFGOutlineComponent::Get(Target->GetWorld())->ShowOutline(Target, Color);
+	}
+
+	bool IsValid() const { return HitComponent || Target; }
+
+	void MakeMovable() const
+	{
+		if (!Target) return;
+		
+		if(auto Root = Target->GetRootComponent())
+			Root->SetMobility(EComponentMobility::Movable);
+		
+		if(IsAbstract)
+			GenerateInstanceHandle().GetInstanceComponent()->SetMobility(EComponentMobility::Movable);
+	}
+
+	FTransform GetTargetTransform() const
+	{
+		if (!Target) return FTransform::Identity;
+		
+		return IsAbstract ? HitComponent->GetComponentTransform() : Target->GetActorTransform();
+	}
+
+	void SetTargetTransform(const FTransform& NewTransform) const
+	{
+		if (!Target) return;
+		
+		if (IsAbstract)
+		{
+			auto InstanceHandle = GenerateInstanceHandle();
+
+			FTransform AbstractTransform;
+			InstanceHandle.GetInstanceComponent()->GetInstanceTransform(InstanceHandle.GetHandleID(), AbstractTransform, true);
+			
+			auto LocationDelta = AbstractTransform.GetLocation() - Target->GetActorLocation();
+			auto RotationDelta = AbstractTransform.GetRotation() * Target->GetActorQuat();
+			auto ScaleDelta = AbstractTransform.GetScale3D() - Target->GetActorScale3D();
+
+			AbstractTransform = FTransform(RotationDelta, LocationDelta, ScaleDelta);
+
+			HitComponent->SetWorldTransform(NewTransform);
+			InstanceHandle.UpdateTransform(NewTransform + AbstractTransform);
+		}
+
+		Target->SetActorTransform(NewTransform);
+		Target->CachedActorTransform = NewTransform;
+	}
+
+	TArray<FInventoryStack> Dismantle(bool NoBuildCost) const
+	{
+		TArray<FInventoryStack> Refund;
+		if(auto Buildable = Cast<AFGBuildable>(Target))
+		{
+			IFGDismantleInterface::Execute_GetDismantleRefund(Buildable, Refund, NoBuildCost);
+			IFGDismantleInterface::Execute_Dismantle(Buildable);
+		}
+
+		return Refund;
+	}
+
+	FBox GetBounds() const
+	{
+		if (!Target) return FBox();
+		return IsAbstract ? HitComponent->Bounds.GetBox() : Target->GetComponentsBoundingBox(true, true);
+	}
+
+	void AddToRaycastIgnored(FCollisionQueryParams& QueryParams) const
+	{
+		if (!Target) return;
+		
+		if (IsAbstract) QueryParams.AddIgnoredComponent(HitComponent);
+		else QueryParams.AddIgnoredActor(Target);
 	}
 
 	FInstanceHandle GenerateInstanceHandle() const
@@ -53,6 +137,7 @@ public:
 	bool Equals(const FArchitectorToolTarget& Other) const { return *this == Other; }
 	bool operator==(const FArchitectorToolTarget& Other) const { return Target == Other.Target; }
 	bool operator==(AActor* Actor) const { return Target == Actor; }
+
 	static bool IsValidTarget(const FHitResult& HitResult)
 	{
 		auto Actor = HitResult.GetActor();
@@ -65,6 +150,9 @@ public:
 
 private:
 
+	UPROPERTY() AActor* Target = nullptr;
+	UPROPERTY() UPrimitiveComponent* HitComponent = nullptr;
+	UPROPERTY() bool IsAbstract = false;
 	UPROPERTY() AActor* HitResultActor = nullptr;
 	UPROPERTY() int32 HitItem = 0;
 	

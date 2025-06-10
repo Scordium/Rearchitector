@@ -63,8 +63,6 @@ public:
 	FBox GetTargetListBoundingBox(FVector& CalculatedCenter) const;
 	void GetTargetListBounds(FVector& Min, FVector& Max) const;
 
-	TArray<AActor*> GetTargetActors() const;
-
 	void AddIgnoredActorsToTrace(FCollisionQueryParams& QueryParams);
 
 	bool HasAnyTargets() const { return Targets.Num() != 0; }
@@ -83,6 +81,16 @@ public:
 	void AddTarget(const FArchitectorToolTarget& Target) { Targets.AddUnique(Target); }
 	void RemoveTarget(const FArchitectorToolTarget& Target) { Targets.Remove(Target); }
 	void ClearTargets() { Targets.Empty(); }
+
+	void HideOutlines() const
+	{
+		for (const auto& Target : Targets) Target.HideOutline();
+	}
+
+	void ShowOutlines(EOutlineColor Color) const
+	{
+		for (const auto& Target : Targets) Target.ShowOutline(Color);
+	}
 
 	UPROPERTY(BlueprintReadWrite, SaveGame)
 	FArchitectorTargetMovement Movement;
@@ -115,7 +123,7 @@ private:
 	}
 
 	template<class T>
-	T* GetIfLastOrMakeNew()
+	T* LastOrNewAction()
 	{
 		static_assert(std::is_base_of<UToolActionBase, T>(), "Action must be derived from UToolActionBase class!");
 

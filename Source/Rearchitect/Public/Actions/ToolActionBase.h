@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ArchitectorRCO.h"
-#include "FGGameState.h"
 #include "FGPlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/Object.h"
 #include "ToolActionBase.generated.h"
 
@@ -33,13 +33,7 @@ public:
 		{
 			FTargetTransformData Data;
 			Data.Target = Target;
-			Data.ActorTransform = Target.Target->GetActorTransform();
-
-			if(Target.IsAbstract)
-			{
-				auto Handle = Target.GenerateInstanceHandle();
-				Handle.GetInstanceComponent()->GetInstanceTransform(Handle.GetHandleID(), Data.AbstractTransform, true);
-			}
+			Data.ActorTransform = Target.GetTargetTransform();
 
 			UndoCache.Add(Data);
 		}
